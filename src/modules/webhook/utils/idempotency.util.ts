@@ -82,6 +82,23 @@ export function generateIdempotencyKey(event: string, data: Record<string, unkno
       // always sends 'logged out'), which would otherwise collapse every disconnect onto one key.
       return `disc_${toStr(data.sessionId)}_${hashData({ reason: data.reason })}${occurrence}`;
 
+    case 'call.incoming':
+      return `call_${toStr(data.sessionId)}_${toStr(data.id)}_incoming`;
+
+    case 'call.state':
+      // A call may revisit a state (active -> on_hold -> active), so the occurrence
+      // salt preserves each transition while remaining stable across delivery retries.
+      return `call_${toStr(data.sessionId)}_${toStr(data.id)}_state_${toStr(data.state)}${occurrence}`;
+
+    case 'call.ended':
+      return `call_${toStr(data.sessionId)}_${toStr(data.id)}_ended`;
+
+    case 'call.error':
+      // Errors can repeat for one call and errors before call allocation have no callId.
+      return `call_${toStr(data.sessionId)}_${toStr(data.callId)}_error_${hashData({
+        error: data.error,
+      })}${occurrence}`;
+
     case 'group.join':
       return `grp_${toStr(data.groupId)}_${toStr(data.participantId)}_join`;
 

@@ -185,6 +185,22 @@ describe('SessionService', () => {
     });
   });
 
+  describe('engine change listeners', () => {
+    it('notifies optional capability modules when an engine is registered and removed', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      const listener = jest.fn();
+      const unsubscribe = service.onEngineChanged(listener);
+
+      await service.start('sess-uuid-1');
+      await service.stop('sess-uuid-1');
+
+      expect(listener).toHaveBeenNthCalledWith(1, 'sess-uuid-1');
+      expect(listener).toHaveBeenNthCalledWith(2, 'sess-uuid-1');
+      unsubscribe();
+    });
+  });
+
   // ── delete/stop teardown resilience ───────────────────────────────
   describe('teardown resilience', () => {
     const enginesOf = () => (service as unknown as { engines: Map<string, unknown> }).engines;

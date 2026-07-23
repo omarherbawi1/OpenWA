@@ -33,6 +33,7 @@ import { useRole } from '../hooks/useRole';
 import { useToast } from '../components/Toast';
 import { PageHeader } from '../components/PageHeader';
 import { GlobalSearch } from '../components/GlobalSearch';
+import { CallPanel } from '../components/CallPanel';
 import {
   useChatMessages,
   useChatMessagesActions,
@@ -92,6 +93,7 @@ export function Chats() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [loadingSessions, setLoadingSessions] = useState<boolean>(true);
+  const [callRefreshToken, setCallRefreshToken] = useState(0);
 
   // Chats list
   const [chats, setChats] = useState<Chat[]>([]);
@@ -351,11 +353,21 @@ export function Chats() {
     [selectedSessionId, queryClient],
   );
 
+  const handleCallEvent = useCallback(
+    (event: { sessionId: string }) => {
+      if (event.sessionId === selectedSessionId) {
+        setCallRefreshToken(token => token + 1);
+      }
+    },
+    [selectedSessionId],
+  );
+
   const { isConnected, connectionFailed, reconnect, subscribe, unsubscribe } = useWebSocket({
     onMessage: handleIncomingMessage,
     onMessageAck: handleIncomingMessageAck,
     onMessageReaction: handleIncomingMessageReaction,
     onMessageRevoked: handleIncomingMessageRevoked,
+    onCallEvent: handleCallEvent,
   });
 
   // A transient WebSocket gap means message.received/ack/revoke events were missed, and the chat
@@ -385,6 +397,10 @@ export function Chats() {
         'message.ack',
         'message.reaction',
         'message.revoked',
+        'call.incoming',
+        'call.state',
+        'call.ended',
+        'call.error',
       ]);
       return () => {
         unsubscribe(selectedSessionId);
@@ -733,7 +749,15 @@ export function Chats() {
         subtitle={t('chats.subtitle')}
         actions={
           sessions.length > 0 && (
-            <GlobalSearch currentSessionId={selectedSessionId} onHit={handleSearchHit} />
+            <>
+              <GlobalSearch currentSessionId={selectedSessionId} onHit={handleSearchHit} />
+              <CallPanel
+                sessionId={selectedSessionId}
+                suggestedPeerId={activeChat?.id}
+                canCall={canWrite}
+                refreshToken={callRefreshToken}
+              />
+            </>
           )
         }
       />

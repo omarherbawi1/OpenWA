@@ -120,6 +120,11 @@ export default () => ({
     baileys: {
       authDir: process.env.BAILEYS_AUTH_DIR || './data/baileys',
     },
+    // Zapo linked-device engine (used when ENGINE_TYPE=zapo). Each session owns one SQLite state
+    // database at <authDir>/<sessionId>/state.sqlite.
+    zapo: {
+      authDir: process.env.ZAPO_AUTH_DIR || './data/zapo',
+    },
   },
 
   sessions: {

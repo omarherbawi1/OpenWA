@@ -192,6 +192,63 @@ curl -X DELETE "$BASE/api/sessions/8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a" \
   -H "X-API-Key: $API_KEY"
 ```
 
+#### Voice calls (`ENGINE_TYPE=zapo`)
+
+List and start one-to-one calls:
+
+```bash
+curl "$BASE/api/sessions/my-session/calls" \
+  -H "X-API-Key: $API_KEY"
+
+curl -X POST "$BASE/api/sessions/my-session/calls" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "peerId": "15551234567@c.us" }'
+```
+
+Accept, reject, end, or mute a call:
+
+```bash
+curl -X POST "$BASE/api/sessions/my-session/calls/CALL_ID/accept" \
+  -H "X-API-Key: $API_KEY"
+
+curl -X POST "$BASE/api/sessions/my-session/calls/CALL_ID/reject" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "declined" }'
+
+curl -X POST "$BASE/api/sessions/my-session/calls/CALL_ID/end" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "user_ended" }'
+
+curl -X PATCH "$BASE/api/sessions/my-session/calls/CALL_ID/mute" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "muted": true }'
+```
+
+The live media plane is Socket.IO, not cURL. Join `/calls` with the same key;
+uplink/downlink frames are little-endian mono `Float32` PCM at 16 kHz:
+
+```js
+import { io } from 'socket.io-client';
+
+const calls = io(`${process.env.BASE}/calls`, {
+  auth: { apiKey: process.env.API_KEY },
+});
+
+calls.on('connect', () => {
+  calls.emit('join-call', { sessionId: 'my-session', callId: 'CALL_ID' }, response => {
+    if (response.ok) startMicrophone(frame => calls.emit('call:uplink', frame, console.log));
+  });
+});
+calls.on('call:downlink', pcmBytes => playPcm(pcmBytes));
+```
+
+See [Linked-device voice calling](voice-calling.md) for backpressure,
+single-uplink ownership, deployment, and live-account requirements.
+
 ### 07.4 Messages
 
 All routes are under `/api/sessions/:sessionId/messages`. Reads accept any API key; send/write routes need an OPERATOR (or higher) key.
@@ -1411,7 +1468,7 @@ socket.on('connect', () => {
   });
 });
 
-socket.on('message', (msg) => {
+socket.on('message', msg => {
   if (msg.type === 'event') {
     console.log(`[${msg.payload.event}] ${msg.payload.sessionId}`, msg.payload.data);
   } else {
@@ -1419,6 +1476,6 @@ socket.on('message', (msg) => {
   }
 });
 
-socket.on('connect_error', (err) => console.error('connect_error:', err.message));
-socket.on('disconnect', (reason) => console.log('disconnected:', reason));
+socket.on('connect_error', err => console.error('connect_error:', err.message));
+socket.on('disconnect', reason => console.log('disconnected:', reason));
 ```

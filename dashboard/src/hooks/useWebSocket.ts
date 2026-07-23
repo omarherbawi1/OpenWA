@@ -52,6 +52,13 @@ interface MessageRevokedEvent {
   timestamp: number;
 }
 
+interface CallControlEvent {
+  sessionId: string;
+  event: 'call.incoming' | 'call.state' | 'call.ended' | 'call.error';
+  data: Record<string, unknown>;
+  timestamp: string;
+}
+
 interface WebSocketEvents {
   onSessionStatus?: (event: SessionStatusEvent) => void;
   onQRCode?: (event: QRCodeEvent) => void;
@@ -59,6 +66,7 @@ interface WebSocketEvents {
   onMessageAck?: (event: MessageAckEvent) => void;
   onMessageReaction?: (event: MessageReactionEvent) => void;
   onMessageRevoked?: (event: MessageRevokedEvent) => void;
+  onCallEvent?: (event: CallControlEvent) => void;
 }
 
 // Shape of the server -> client event envelope produced by the NestJS gateway.
@@ -224,6 +232,17 @@ export function useWebSocket(events: WebSocketEvents = {}) {
             body: String(data.body ?? ''),
             type: String(data.type),
             timestamp: Number(data.timestamp),
+          });
+          break;
+        case 'call.incoming':
+        case 'call.state':
+        case 'call.ended':
+        case 'call.error':
+          events.onCallEvent?.({
+            sessionId,
+            event,
+            data,
+            timestamp: msg.timestamp,
           });
           break;
         default:

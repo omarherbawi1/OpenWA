@@ -66,6 +66,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check Zapo native voice runtime
+        run: npm run check:zapo-runtime
+
       - name: Run unit tests
         run: npm test -- --coverage
 

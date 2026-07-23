@@ -1,0 +1,421 @@
+.call-panel-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 42px;
+  padding: 0.625rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-white);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.call-panel-trigger:hover,
+.call-panel-trigger.is-active {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: var(--primary-soft);
+  color: var(--text-primary);
+}
+
+.call-panel-trigger__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.call-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 0.55);
+  backdrop-filter: blur(3px);
+  animation: call-panel-fade-in 150ms ease-out;
+}
+
+.call-panel {
+  width: min(100%, 440px);
+  max-height: min(720px, calc(100vh - 2rem));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg-white);
+  box-shadow: 0 24px 60px rgb(15 23 42 / 0.28);
+  color: var(--text-primary);
+  animation: call-panel-rise 180ms ease-out;
+}
+
+.call-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.call-panel__header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+
+.call-panel__header p {
+  max-width: 34rem;
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.call-panel__close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-light);
+  color: var(--text-secondary);
+}
+
+.call-panel__close:hover {
+  border-color: color-mix(in srgb, var(--error) 35%, var(--border));
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+}
+
+.call-panel__body {
+  max-height: calc(100vh - 11rem);
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.call-panel__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  min-height: 180px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.call-panel__current {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.call-panel__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 0.25rem 0 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.call-panel__avatar.is-ringing {
+  color: var(--success);
+  animation: call-panel-ring 1.6s ease-in-out infinite;
+}
+
+.call-panel__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.call-panel__identity strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.9375rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-panel__direction {
+  margin-bottom: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.call-panel__status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.55rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-light);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.call-panel__status.status-active,
+.call-panel__status.status-accepted {
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+}
+
+.call-panel__status.status-ringing,
+.call-panel__status.status-incoming_ringing,
+.call-panel__status.status-initiating,
+.call-panel__status.status-dialing,
+.call-panel__status.status-queued,
+.call-panel__status.status-connecting {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  color: color-mix(in srgb, var(--warning) 82%, var(--text-primary));
+}
+
+.call-panel__status.status-on_hold {
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info);
+}
+
+.call-panel__status.status-failed,
+.call-panel__status.status-rejected,
+.call-panel__status.status-missed {
+  background: color-mix(in srgb, var(--error) 11%, transparent);
+  color: var(--error);
+}
+
+.call-panel__connection,
+.call-panel__notice,
+.call-panel__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-sizing: border-box;
+  background: var(--bg-light);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: start;
+}
+
+.call-panel__notice {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  color: color-mix(in srgb, var(--warning) 78%, var(--text-primary));
+}
+
+.call-panel__error {
+  border-color: color-mix(in srgb, var(--error) 35%, var(--border));
+  background: color-mix(in srgb, var(--error) 9%, transparent);
+  color: var(--error);
+}
+
+.call-panel__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1.25rem;
+}
+
+.call-panel__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-light);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.call-panel__button:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  background: var(--bg-white);
+}
+
+.call-panel__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.call-panel__button--primary,
+.call-panel__button--accept {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #062b14;
+}
+
+.call-panel__button--primary:hover:not(:disabled),
+.call-panel__button--accept:hover:not(:disabled) {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+  color: #fff;
+}
+
+.call-panel__button--danger {
+  border-color: color-mix(in srgb, var(--error) 45%, var(--border));
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+}
+
+.call-panel__button--danger:hover:not(:disabled) {
+  border-color: var(--error);
+  background: var(--error);
+  color: #fff;
+}
+
+.call-panel__button--muted {
+  border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
+  background: color-mix(in srgb, var(--warning) 11%, transparent);
+  color: color-mix(in srgb, var(--warning) 78%, var(--text-primary));
+}
+
+.call-panel__button--wide {
+  width: 100%;
+  margin-top: 1.25rem;
+}
+
+.call-panel__dial {
+  display: flex;
+  flex-direction: column;
+}
+
+.call-panel__dial label,
+.call-panel__switcher label {
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.call-panel__dial input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-sizing: border-box;
+  background: var(--bg-light);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.875rem;
+}
+
+.call-panel__dial input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.call-panel__dial p {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.call-panel__switcher {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+@keyframes call-panel-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes call-panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes call-panel-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+@media (max-width: 520px) {
+  .call-panel-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .call-panel {
+    width: 100%;
+    max-height: 90vh;
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .call-panel__body {
+    max-height: calc(90vh - 7rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-panel-backdrop,
+  .call-panel,
+  .call-panel__avatar.is-ringing {
+    animation: none;
+  }
+}

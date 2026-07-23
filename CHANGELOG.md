@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Linked-device voice calling.** A new `zapo` engine adds incoming and outgoing
+  one-to-one calls with encrypted MLow/SRTP media, REST call controls, lifecycle
+  events/webhooks, an authenticated Socket.IO PCM media plane, and dashboard
+  microphone/speaker controls. Zapo sessions use a separate QR-linked SQLite
+  store and require `@roamhq/wrtc`, `libmlow-wasm`, and outbound relay access.
+
 - **`AuditAction` emit-coverage gate.** A structural test now fails the build when an `AuditAction`
   enum value is neither emitted at a real call site nor registered (with a reason) in a new
   intentionally-unemitted registry. A declared audit event can no longer silently exist with no

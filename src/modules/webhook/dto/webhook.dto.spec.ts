@@ -19,7 +19,10 @@ describe('webhook DTO event validation', () => {
 
   it('CreateWebhookDto: accepts known events', async () => {
     expect(
-      await errorsFor(CreateWebhookDto, { url: 'https://x.example/hook', events: ['message.received', 'group.join'] }),
+      await errorsFor(CreateWebhookDto, {
+        url: 'https://x.example/hook',
+        events: ['message.received', 'group.join', 'call.incoming', 'call.state', 'call.ended', 'call.error'],
+      }),
     ).toHaveLength(0);
   });
 

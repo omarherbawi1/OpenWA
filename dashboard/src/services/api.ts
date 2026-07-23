@@ -1,7 +1,7 @@
 // API Service Layer for OpenWA Dashboard
 // Centralized API client with TypeScript types
 
-import { warnIfInsecureHttpUrl } from '../utils/urlSecurity';
+import { warnIfInsecureHttpUrl } from '../utils/urlSecurity.ts';
 
 // Resolve the API base URL. By default this is the same-origin relative path '/api',
 // correct when the dashboard and API are served from the same origin (the default
@@ -12,7 +12,7 @@ import { warnIfInsecureHttpUrl } from '../utils/urlSecurity';
 // same-origin '/api' and a split deployment failed with "Invalid API Key" (#91).
 // Exported so direct fetches (e.g. auth/validate in Login.tsx / App.tsx) honor VITE_API_URL
 // too — otherwise split-origin deployments break. Empty VITE_API_URL → '/api'.
-const API_ORIGIN = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+const API_ORIGIN = (import.meta.env?.VITE_API_URL ?? '').replace(/\/+$/, '');
 export const API_BASE_URL = `${API_ORIGIN}/api`;
 // Warn (not refuse — would break dev + TLS-terminating-proxy) when the API origin is an
 // insecure http:// URL pointing at a non-localhost host (API keys sent in cleartext).
@@ -131,6 +131,41 @@ export interface Chat {
   unreadCount: number;
   timestamp: number;
   lastMessage?: string;
+}
+
+export type CallDirection = 'incoming' | 'outgoing';
+export type CallState =
+  | 'initiating'
+  | 'ringing'
+  | 'incoming_ringing'
+  | 'connecting'
+  | 'active'
+  | 'on_hold'
+  | 'ended';
+
+/** Audio-only call state returned by `/sessions/:sessionId/calls`. */
+export interface VoiceCall {
+  id: string;
+  peerId: string;
+  direction: CallDirection;
+  state: CallState;
+  media: 'audio';
+  muted: boolean;
+  createdAt: string;
+  connectedAt?: string;
+  endedAt?: string;
+  durationSeconds?: number;
+  endReason?: string;
+  canAccept: boolean;
+  canReject: boolean;
+}
+
+export interface CreateVoiceCallPayload {
+  peerId: string;
+}
+
+export interface CallActionResponse {
+  success: boolean;
 }
 
 // Engine-neutral message types (mirrors the backend's IWhatsAppEngine MessageType). The backend
@@ -476,6 +511,42 @@ export const sessionApi = {
         includeMedia ? '&includeMedia=true' : ''
       }`,
     ),
+};
+
+// =============================================================================
+// Voice Call API
+// =============================================================================
+
+const callsPath = (sessionId: string) => `/sessions/${encodeURIComponent(sessionId)}/calls`;
+const callPath = (sessionId: string, callId: string) =>
+  `${callsPath(sessionId)}/${encodeURIComponent(callId)}`;
+
+export const callApi = {
+  list: (sessionId: string) => request<VoiceCall[]>(callsPath(sessionId)),
+  create: (sessionId: string, data: CreateVoiceCallPayload) =>
+    request<VoiceCall>(callsPath(sessionId), {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  get: (sessionId: string, callId: string) =>
+    request<VoiceCall>(callPath(sessionId, callId)),
+  accept: (sessionId: string, callId: string) =>
+    request<CallActionResponse>(`${callPath(sessionId, callId)}/accept`, { method: 'POST' }),
+  reject: (sessionId: string, callId: string) =>
+    request<CallActionResponse>(`${callPath(sessionId, callId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  end: (sessionId: string, callId: string) =>
+    request<CallActionResponse>(`${callPath(sessionId, callId)}/end`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  mute: (sessionId: string, callId: string, muted: boolean) =>
+    request<CallActionResponse>(`${callPath(sessionId, callId)}/mute`, {
+      method: 'PATCH',
+      body: JSON.stringify({ muted }),
+    }),
 };
 
 // =============================================================================

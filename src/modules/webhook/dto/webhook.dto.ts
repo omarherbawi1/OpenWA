@@ -43,6 +43,10 @@ export const WEBHOOK_EVENTS = [
   'session.qr',
   'session.authenticated',
   'session.disconnected',
+  'call.incoming',
+  'call.state',
+  'call.ended',
+  'call.error',
   ...WEBHOOK_RESERVED_EVENTS,
 ] as const;
 

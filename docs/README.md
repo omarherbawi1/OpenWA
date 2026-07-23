@@ -185,6 +185,7 @@ socket.on('message', msg => {
 | WebSocket Events (Socket.IO)    | Ready                         |
 | Multi-session Support           | Ready                         |
 | Web Dashboard                   | Ready                         |
+| Linked-device 1:1 voice calls   | Ready with `ENGINE_TYPE=zapo` |
 | Docker Deployment               | Ready                         |
 | Webhooks with HMAC Signature    | Ready                         |
 | SQLite / PostgreSQL Storage     | Ready                         |
@@ -194,7 +195,7 @@ socket.on('message', msg => {
 | Audit Logging                   | Ready                         |
 | Groups / Contacts / Labels API  | Ready                         |
 | Channels / Status / Catalog API | Experimental (engine-limited) |
-| Pluggable Engine (wwebjs / Baileys) | Ready (set `ENGINE_TYPE`)  |
+| Pluggable Engine (wwebjs / Baileys / Zapo voice) | Ready (set `ENGINE_TYPE`) |
 | Plugin Extension System         | Ready                         |
 | Queue-based Webhook Retries     | Optional (QUEUE_ENABLED=true) |
 
@@ -205,12 +206,17 @@ socket.on('message', msg => {
 | Runtime   | Node.js 22 LTS                |
 | Framework | NestJS 11.x                   |
 | Language  | TypeScript 5.x                |
-| WA Engine | Pluggable (`ENGINE_TYPE`): whatsapp-web.js (default) or Baileys |
+| WA Engine | Pluggable (`ENGINE_TYPE`): whatsapp-web.js (default), Baileys, or Zapo voice |
 | WebSocket | Socket.IO                     |
 | Database  | SQLite (default) / PostgreSQL |
 | ORM       | TypeORM                       |
 | Container | Docker + Docker Compose       |
 | Dashboard | React + Vite + TanStack Query |
+
+`ENGINE_TYPE=zapo` enables linked-device one-to-one voice calling through the
+dashboard. It uses a separate QR-linked Zapo store, requires outbound UDP access
+to WhatsApp media relays, and needs HTTPS or localhost for browser microphone
+capture. Existing whatsapp-web.js/Baileys credentials cannot be reused.
 
 ## Project Structure
 

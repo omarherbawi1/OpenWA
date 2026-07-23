@@ -2893,7 +2893,7 @@ Webhooks are configured per session and managed under `/api/sessions/:sessionId/
 
 Two fields — `secret` and `headers` — are **write-only**: they are accepted on create/update but are **never** returned in any response (the response DTO has no `@Expose` for them, so `fromEntity` drops them). The `secret` is used to compute the `X-OpenWA-Signature: sha256=<hex>` HMAC-SHA256 header on deliveries.
 
-The `events` array accepts these members plus the `*` wildcard: `message.received`, `message.sent`, `message.ack`, `message.failed`, `message.revoked`, `message.reaction`, `session.status`, `session.qr`, `session.authenticated`, `session.disconnected`, `group.join`, `group.leave`, `group.update`. The `group.*` events are **reserved** — accepted and validated but never dispatched (no engine emit source).
+The `events` array accepts these members plus the `*` wildcard: `message.received`, `message.sent`, `message.ack`, `message.failed`, `message.revoked`, `message.reaction`, `session.status`, `session.qr`, `session.authenticated`, `session.disconnected`, `call.incoming`, `call.state`, `call.ended`, `call.error`, `group.join`, `group.leave`, `group.update`. The `group.*` events are **reserved** — accepted and validated but never dispatched (no engine emit source).
 
 #### GET /api/sessions/:sessionId/webhooks
 
@@ -4473,11 +4473,34 @@ contract surface for a future plugin provider whose `search()` throws `ServiceUn
 > overridden via the query — there is no `sessionIds` query parameter, and `SearchService` overwrites
 > any session scope at the provider boundary.
 
+### Voice call REST API (Zapo engine)
+
+These routes require a started `ENGINE_TYPE=zapo` session. Reads accept a valid
+session-scoped key; mutations require `OPERATOR` or `ADMIN`. Other engines
+return `501` because they do not expose live call media.
+
+| Method  | Route                                           | Body                                    |
+| ------- | ----------------------------------------------- | --------------------------------------- |
+| `GET`   | `/api/sessions/:sessionId/calls`                | —                                       |
+| `GET`   | `/api/sessions/:sessionId/calls/:callId`        | —                                       |
+| `POST`  | `/api/sessions/:sessionId/calls`                | `{ "peerId": "15551234567@c.us" }`      |
+| `POST`  | `/api/sessions/:sessionId/calls/:callId/accept` | —                                       |
+| `POST`  | `/api/sessions/:sessionId/calls/:callId/reject` | `{ "reason": "declined" }` (optional)   |
+| `POST`  | `/api/sessions/:sessionId/calls/:callId/end`    | `{ "reason": "user_ended" }` (optional) |
+| `PATCH` | `/api/sessions/:sessionId/calls/:callId/mute`   | `{ "muted": true }`                     |
+
+Call objects expose `id`, `peerId`, `direction`, `state`, `media`, `muted`,
+timestamps/duration when available, `endReason`, `canAccept`, and `canReject`.
+The current engine call registry is authoritative: a stale call id returns
+`404` and cannot be used to mutate state or join media.
+
 ## 6.5 Real-time API (WebSocket)
 
-Live events are delivered over a **Socket.IO** connection (not a raw WebSocket). The server mounts a single Socket.IO namespace, **`/events`**, on the same port as the REST API. There are no REST routes in this module.
+Real-time traffic uses **Socket.IO** (not a raw WebSocket) on the REST API port.
+The server mounts **`/events`** for JSON lifecycle events and **`/calls`** for
+binary voice media. Both use the default `/socket.io` transport path.
 
-### Connecting
+### Connecting to `/events`
 
 Point a Socket.IO client at `<host>:2785` with path-less namespace `/events`:
 
@@ -4563,6 +4586,10 @@ session.status
 session.qr
 session.authenticated
 session.disconnected
+call.incoming
+call.state
+call.ended
+call.error
 ```
 
 A subscribe request whose `events` array contains no recognized name (after filtering) is rejected with `INVALID_EVENTS`. Unknown names mixed with valid ones are silently dropped; the `subscribed` reply echoes only the accepted events.
@@ -4602,6 +4629,30 @@ socket.on('message', (msg) => {
 });
 ```
 
+### Live call media namespace (`/calls`)
+
+Connect to `<origin>/calls` with an `OPERATOR` or `ADMIN` key in
+`auth.apiKey`. The key is revalidated against `sessionId` when `join-call` is
+received. Query-string credentials are rejected.
+
+| Direction       | Socket.IO event        | Payload                                               |
+| --------------- | ---------------------- | ----------------------------------------------------- |
+| client → server | `join-call`            | `{ sessionId, callId }` plus acknowledgement          |
+| client → server | `leave-call`           | `{ sessionId, callId }`                               |
+| client → server | `call:uplink`          | little-endian mono `Float32` PCM plus acknowledgement |
+| server → client | `joined`               | `{ ok, sessionId, callId, sampleRate: 16000 }`        |
+| server → client | `call:downlink`        | little-endian mono `Float32` PCM                      |
+| server → client | `backpressure`         | `{ paused, queuedMs, retryAfterMs }`                  |
+| server → client | `call-ended`           | terminal call object                                  |
+| server → client | `error` / `call:error` | `{ ok: false, code, message }`                        |
+
+Uplink frames contain normalized samples in `[-1, 1]` and may contain at most
+one second at 16 kHz. Only one joined socket owns the microphone; other joined
+sockets remain listeners. A paused client waits `retryAfterMs`, then probes
+again and resumes only after `paused: false`. Terminal calls, API-key eviction,
+session replacement, and the last listener leaving all disable external audio
+and close the media room.
+
 ## 6.6 Webhook Events & Delivery Semantics
 
 Every registered webhook receives an HTTP `POST` with a JSON body of this shape:
@@ -4635,6 +4686,10 @@ These are the events OpenWA actually emits. A webhook is registered with an `eve
 | `session.authenticated` | The session pairs and becomes ready | `{ sessionId, phone, pushName }` |
 | `session.disconnected` | The session disconnects | `{ sessionId, reason }` |
 | `session.status` | The session status transitions | `{ sessionId, status }` where `status` is one of `created` / `initializing` / `qr_ready` / `authenticating` / `ready` / `disconnected` / `failed` |
+| `call.incoming` | A one-to-one Zapo voice call rings | The current call object |
+| `call.state` | Call state changes | The current call object |
+| `call.ended` | A call reaches a terminal state or its engine is removed | The terminal call object |
+| `call.error` | Call signaling or media fails | `{ callId?, error }` |
 
 > **`STORE_EPHEMERAL_MESSAGES=false` affects `message.received`.** When `STORE_EPHEMERAL_MESSAGES` is set to `false`, incoming disappearing messages (those with `ephemeralDuration > 0`) are **not** persisted nor dispatched — no DB insert, no webhook delivery, and no websocket event. Downstream consumers and the dashboard both stop seeing them. Default is `true` (backward compatible — store and dispatch everything).
 

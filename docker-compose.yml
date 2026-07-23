@@ -124,6 +124,7 @@ services:
       # layer (configuration.ts) supplies the sane container default (headless, ./data/sessions, the
       # sandbox + no-dev-shm flag set) when nothing is set anywhere. Set one on the host/.env to pin it.
       - SESSION_DATA_PATH=${SESSION_DATA_PATH:-}
+      - ZAPO_AUTH_DIR=${ZAPO_AUTH_DIR:-}
       - PUPPETEER_HEADLESS=${PUPPETEER_HEADLESS:-}
       - PUPPETEER_ARGS=${PUPPETEER_ARGS:-}
       # Optional WhatsApp Web version override. Leave empty for whatsapp-web.js auto-selection.

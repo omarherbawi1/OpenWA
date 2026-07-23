@@ -67,6 +67,22 @@ describe('configuration — Puppeteer args delimiter', () => {
   });
 });
 
+describe('configuration — Zapo auth directory', () => {
+  const orig = process.env.ZAPO_AUTH_DIR;
+
+  afterEach(() => {
+    if (orig === undefined) delete process.env.ZAPO_AUTH_DIR;
+    else process.env.ZAPO_AUTH_DIR = orig;
+  });
+
+  it('defaults to ./data/zapo and honors ZAPO_AUTH_DIR', () => {
+    delete process.env.ZAPO_AUTH_DIR;
+    expect(configuration().engine.zapo.authDir).toBe('./data/zapo');
+    process.env.ZAPO_AUTH_DIR = '/var/lib/openwa/zapo';
+    expect(configuration().engine.zapo.authDir).toBe('/var/lib/openwa/zapo');
+  });
+});
+
 describe('configuration — Postgres pool timeouts', () => {
   const keys = ['DATABASE_STATEMENT_TIMEOUT_MS', 'DATABASE_IDLE_TIMEOUT_MS', 'DATABASE_CONNECTION_TIMEOUT_MS'];
   const orig: Record<string, string | undefined> = {};

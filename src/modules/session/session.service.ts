@@ -53,6 +53,8 @@ interface ReconnectState {
   baseDelay: number;
 }
 
+export type SessionEngineChangedListener = (sessionId: string) => void;
+
 // Reconnect-backoff bounds. An OPERATOR-supplied session.config feeds this math, so the values
 // are coerced + clamped: a non-numeric value would otherwise make the delay NaN (setTimeout fires
 // at 0 — relaunch storm) and the terminal guard `attempts >= NaN` always false (unbounded loop).
@@ -118,6 +120,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
 
   // In-memory map of active engine instances
   private engines: Map<string, IWhatsAppEngine> = new Map();
+  private readonly engineChangedListeners = new Set<SessionEngineChangedListener>();
   // Bounded cache for inline @lid -> phone resolution (#263), keyed `${sessionId}:${lid}`. Caches
   // misses (null) too, so a chatty unmapped sender isn't re-queried on every message (which also
   // reduces engine rate-limit pressure). Best-effort feature, so staleness is acceptable.
@@ -252,7 +255,10 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     await Promise.allSettled(
       [...this.engines].map(([sessionId, engine]) => this.destroyEngineSafely(sessionId, engine)),
     );
+    const removedSessionIds = [...this.engines.keys()];
     this.engines.clear();
+    for (const sessionId of removedSessionIds) this.notifyEngineChanged(sessionId);
+    this.engineChangedListeners.clear();
   }
 
   /** Destroy one engine, isolating + time-bounding failures so shutdown can't be stalled or aborted. */
@@ -298,7 +304,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * already broken, so a graceful close would only time out before the process is reaped.
    */
   private evictAndForceDestroy(id: string, engine: IWhatsAppEngine): void {
-    this.engines.delete(id);
+    this.deleteEngine(id);
     void this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
   }
 
@@ -403,7 +409,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       const engine = this.engines.get(id);
       if (engine) {
         await this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
-        this.engines.delete(id);
+        this.deleteEngine(id);
       }
 
       // Execute hook BEFORE delete so plugins can access session data
@@ -523,7 +529,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         // for a wedged engine, which is exactly the state this catch block is handling.
         const orphan = this.engines.get(id);
         if (orphan) {
-          this.engines.delete(id);
+          this.deleteEngine(id);
           this.sessionErrors.set(id, err instanceof Error ? err.message : String(err));
           await this.teardownEngineSafely(id, orphan, e => e.forceDestroy(), 'force-destroy');
           await this.updateStatus(id, SessionStatus.FAILED).catch(() => undefined);
@@ -540,7 +546,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         const resurrected = this.engines.get(id);
         if (resurrected) {
           await this.teardownEngineSafely(id, resurrected, e => e.destroy(), 'destroy');
-          this.engines.delete(id);
+          this.deleteEngine(id);
         }
       }
       return this.findOne(id);
@@ -659,6 +665,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       proxyType: session.proxyType || undefined,
     });
     this.engines.set(id, engine);
+    this.notifyEngineChanged(id);
     // Clear any prior failure reason before a fresh start.
     this.sessionErrors.delete(id);
 
@@ -1197,7 +1204,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         // TRUE for the duration of the teardown await is the sole deterministic block on a concurrent
         // start() (start() clears stoppingSessions rather than rejecting on it), so delete-first would
         // open a start()-during-teardown orphan-engine window. Verified in the teardown-ordering audit.
-        this.engines.delete(id);
+        this.deleteEngine(id);
         // Force-kill whatever got launched so a retry doesn't collide with an orphaned browser.
         // teardownEngineSafely is itself time-bound, so this can't wedge a second time.
         await this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
@@ -1331,7 +1338,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       const oldEngine = this.engines.get(id);
       if (oldEngine) {
         await this.teardownEngineSafely(id, oldEngine, e => e.destroy(), 'destroy');
-        this.engines.delete(id);
+        this.deleteEngine(id);
       }
 
       // Re-initialize
@@ -1354,7 +1361,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         const resurrected = this.engines.get(id);
         if (resurrected) {
           await this.teardownEngineSafely(id, resurrected, e => e.destroy(), 'destroy');
-          this.engines.delete(id);
+          this.deleteEngine(id);
         }
         return;
       }
@@ -1400,7 +1407,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     const engine = this.engines.get(id);
     if (engine) {
       await this.teardownEngineSafely(id, engine, e => e.disconnect(), 'disconnect');
-      this.engines.delete(id);
+      this.deleteEngine(id);
     }
 
     this.logger.log(`Session stopped: ${session.name}`, {
@@ -1427,7 +1434,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     const engine = this.engines.get(id);
     if (engine) {
       await this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
-      this.engines.delete(id);
+      this.deleteEngine(id);
     }
 
     this.logger.warn(`Session force-killed: ${session.name}`, {
@@ -1482,6 +1489,42 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
 
   getEngine(id: string): IWhatsAppEngine | undefined {
     return this.engines.get(id);
+  }
+
+  private deleteEngine(id: string): void {
+    if (this.engines.delete(id)) {
+      this.notifyEngineChanged(id);
+    }
+  }
+
+  /**
+   * Observe engine generations without coupling SessionService to optional
+   * capability modules. Existing engines are replayed so a late subscriber can
+   * attach before serving requests.
+   */
+  onEngineChanged(listener: SessionEngineChangedListener): () => void {
+    this.engineChangedListeners.add(listener);
+    for (const sessionId of this.engines.keys()) {
+      this.notifyEngineListener(listener, sessionId);
+    }
+    return () => this.engineChangedListeners.delete(listener);
+  }
+
+  private notifyEngineChanged(sessionId: string): void {
+    for (const listener of this.engineChangedListeners) {
+      this.notifyEngineListener(listener, sessionId);
+    }
+  }
+
+  private notifyEngineListener(listener: SessionEngineChangedListener, sessionId: string): void {
+    try {
+      listener(sessionId);
+    } catch (error) {
+      this.logger.warn(`Engine registration listener failed for session ${sessionId}`, {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**

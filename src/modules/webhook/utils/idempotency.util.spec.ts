@@ -135,6 +135,29 @@ describe('Idempotency Utils', () => {
       );
     });
 
+    it('keys incoming and ended call lifecycle events by session and call ID', () => {
+      expect(generateIdempotencyKey('call.incoming', { sessionId: 'A', id: 'C1' })).toBe('call_A_C1_incoming');
+      expect(generateIdempotencyKey('call.ended', { sessionId: 'A', id: 'C1' })).toBe('call_A_C1_ended');
+      expect(generateIdempotencyKey('call.incoming', { sessionId: 'B', id: 'C1' })).not.toBe('call_A_C1_incoming');
+    });
+
+    it('salts repeatable call state/error occurrences while remaining retry-stable', () => {
+      const state = { sessionId: 'A', id: 'C1', state: 'active' };
+      const error = { sessionId: 'A', callId: 'C1', error: 'media failed' };
+      const first = '2026-07-13T00:00:00.000Z';
+      const second = '2026-07-13T00:01:00.000Z';
+
+      expect(generateIdempotencyKey('call.state', state, first)).toBe(
+        generateIdempotencyKey('call.state', state, first),
+      );
+      expect(generateIdempotencyKey('call.state', state, first)).not.toBe(
+        generateIdempotencyKey('call.state', state, second),
+      );
+      expect(generateIdempotencyKey('call.error', error, first)).not.toBe(
+        generateIdempotencyKey('call.error', error, second),
+      );
+    });
+
     it('gives two senders reacting to the same message DISTINCT message.reaction keys', () => {
       const at = '2026-06-20T00:00:00.000Z';
       const a = generateIdempotencyKey('message.reaction', { sessionId: 'A', messageId: 'M', senderId: 'S1' }, at);

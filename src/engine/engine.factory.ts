@@ -7,6 +7,7 @@ import { WhatsAppWebJsAdapter } from './adapters/whatsapp-web-js.adapter';
 import { PluginLoaderService, PluginType, IEnginePlugin, PluginManifest } from '../core/plugins';
 import { WhatsAppWebJsPlugin } from '../plugins/engines/whatsapp-web-js';
 import { BaileysPlugin } from '../plugins/engines/baileys';
+import { ZapoPlugin } from '../plugins/engines/zapo';
 import { createLogger } from '../common/services/logger.service';
 import { BaileysMessageStoreService } from './adapters/baileys-message-store.service';
 import { LidMappingStoreService } from './identity/lid-mapping-store.service';
@@ -77,6 +78,18 @@ export class EngineFactory implements OnModuleInit {
       new BaileysPlugin(this.baileysMessageStore, engineConfig, this.lidMappingStore),
       engineConfig,
     );
+
+    // Register Zapo as the built-in linked-device + real-time voice engine.
+    const zapoManifest: PluginManifest = {
+      id: 'zapo',
+      name: 'Zapo Engine',
+      version: '1.0.0',
+      type: PluginType.ENGINE,
+      description: 'Zapo linked-device engine with persistent SQLite state and real-time voice calls',
+      main: 'index.ts',
+      provides: ['whatsapp-engine', 'voice-calls'],
+    };
+    this.pluginLoader.registerBuiltInPlugin(zapoManifest, new ZapoPlugin(engineConfig), engineConfig);
 
     // Auto-enable the configured engine
     try {
@@ -161,13 +174,17 @@ export class EngineFactory implements OnModuleInit {
 
   /**
    * The on-disk auth directory the active engine keeps for `sessionName`, matching exactly what each
-   * adapter constructs: baileys uses `path.join(authDir, name)` (authDir left unresolved, as the
-   * adapter does); whatsapp-web.js resolves sessionDataPath and appends `session-${name}` (mirrors
+   * adapter constructs: baileys/zapo use `path.join(authDir, name)` (authDir left unresolved, as the
+   * adapters do); whatsapp-web.js resolves sessionDataPath and appends `session-${name}` (mirrors
    * WhatsAppWebJsAdapter.clearLocalAuth).
    */
   private sessionAuthDir(sessionName: string): string {
     if (this.engineType === 'baileys') {
       const authDir = this.configService.get<string>('engine.baileys.authDir') ?? './data/baileys';
+      return path.join(authDir, sessionName);
+    }
+    if (this.engineType === 'zapo') {
+      const authDir = this.configService.get<string>('engine.zapo.authDir') ?? './data/zapo';
       return path.join(authDir, sessionName);
     }
     const sessionDataPath = this.configService.get<string>('engine.sessionDataPath') ?? './data/sessions';

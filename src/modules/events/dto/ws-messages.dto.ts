@@ -24,6 +24,10 @@ export const SUBSCRIBABLE_EVENTS = [
   'session.qr',
   'session.authenticated',
   'session.disconnected',
+  'call.incoming',
+  'call.state',
+  'call.ended',
+  'call.error',
 ] as const;
 
 export type SubscribableEvent = (typeof SUBSCRIBABLE_EVENTS)[number] | '*';

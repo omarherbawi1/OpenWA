@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, UnauthorizedException, OnModuleInit } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
@@ -11,7 +10,7 @@ import { hashApiKey } from './api-key-hash';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 import { CreateApiKeyDto, UpdateApiKeyDto } from './dto';
 import { createLogger } from '../../common/services/logger.service';
-import { EventsGateway, type ApiKeyEvictionReason } from '../events/events.gateway';
+import { WebSocketEvictionRegistry, type ApiKeyEvictionReason } from './websocket-eviction.registry';
 
 const API_KEY_FILE = join(process.cwd(), 'data', '.api-key');
 
@@ -57,7 +56,7 @@ export class AuthService implements OnModuleInit {
   constructor(
     @InjectRepository(ApiKey, 'main')
     private readonly apiKeyRepository: Repository<ApiKey>,
-    private readonly moduleRef: ModuleRef,
+    private readonly socketEvictionRegistry: WebSocketEvictionRegistry,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -175,7 +174,7 @@ export class AuthService implements OnModuleInit {
 
     // Capture the authorization-relevant fields BEFORE applying the change. Only a change to role,
     // allowedIps, allowedSessions, or expiry can widen or restrict what an already-connected WebSocket
-    // socket may see, so only those trigger eviction of live /events sockets — a benign rename must
+    // socket may see, so only those trigger eviction across registered namespaces — a benign rename must
     // NOT disconnect clients. REST enforces the new state immediately; without eviction a live socket
     // keeps streaming events for sessions/IPs the key just lost until it resubscribes or drops.
     const before = {
@@ -232,18 +231,10 @@ export class AuthService implements OnModuleInit {
     return saved;
   }
 
-  /**
-   * Disconnect every WebSocket socket authenticated with the given key id. Resolved lazily via
-   * ModuleRef (not constructor injection) to avoid a static DI cycle between AuthModule and
-   * EventsModule. Best-effort: if the WS gateway isn't loaded (or has no sockets for the key),
-   * this is a silent no-op.
-   */
+  /** Disconnect every WebSocket socket authenticated with the given key id. */
   private evictActiveSockets(keyId: string, reason: ApiKeyEvictionReason = 'revoked'): void {
     try {
-      const gateway = this.moduleRef.get(EventsGateway, { strict: false });
-      if (gateway) {
-        gateway.evictApiKey(keyId, reason);
-      }
+      this.socketEvictionRegistry.evictApiKey(keyId, reason);
     } catch (error) {
       // Eviction is best-effort: the key's DB state is already authoritative (validateApiKey
       // rejects it), so a failure here must never roll back the revoke/delete.

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BaileysAdapter } from './adapters/baileys.adapter';
 import { WhatsAppWebJsAdapter } from './adapters/whatsapp-web-js.adapter';
+import { ZapoAdapter } from './adapters/zapo.adapter';
 import { ENGINE_CAPABILITY_MATRIX } from './engine-capability-matrix';
 
 /**
@@ -34,10 +35,11 @@ function readInterfaceMethods(): string[] {
 }
 
 type AdapterCtor = { prototype: Record<string, unknown> };
-type AdapterKey = 'wwjs' | 'baileys';
+type AdapterKey = 'wwjs' | 'baileys' | 'zapo';
 const ADAPTERS: ReadonlyArray<[AdapterKey, AdapterCtor]> = [
   ['wwjs', WhatsAppWebJsAdapter as unknown as AdapterCtor],
   ['baileys', BaileysAdapter as unknown as AdapterCtor],
+  ['zapo', ZapoAdapter as unknown as AdapterCtor],
 ];
 
 function liveThrows(adapter: AdapterCtor, method: string): boolean {

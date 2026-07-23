@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AuthValidateController } from './auth-validate.controller';
 import { ApiKeyGuard } from './guards/api-key.guard';
 import { ProxyAwareThrottlerGuard } from '../../common/security/proxy-aware-throttler.guard';
+import { WebSocketEvictionRegistry } from './websocket-eviction.registry';
 
 @Global()
 @Module({
@@ -14,6 +15,7 @@ import { ProxyAwareThrottlerGuard } from '../../common/security/proxy-aware-thro
   controllers: [AuthController, AuthValidateController],
   providers: [
     AuthService,
+    WebSocketEvictionRegistry,
     {
       provide: APP_GUARD,
       useClass: ProxyAwareThrottlerGuard,
@@ -23,6 +25,6 @@ import { ProxyAwareThrottlerGuard } from '../../common/security/proxy-aware-thro
       useClass: ApiKeyGuard,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, WebSocketEvictionRegistry],
 })
 export class AuthModule {}

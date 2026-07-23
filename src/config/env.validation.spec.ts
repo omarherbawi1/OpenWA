@@ -53,6 +53,7 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ENGINE_TYPE: 'bailys' })).toThrow(/ENGINE_TYPE/);
     expect(() => validateEnv({ ENGINE_TYPE: 'whatsapp-web.js' })).not.toThrow();
     expect(() => validateEnv({ ENGINE_TYPE: 'baileys' })).not.toThrow();
+    expect(() => validateEnv({ ENGINE_TYPE: 'zapo' })).not.toThrow();
   });
 
   it('rejects a STORAGE_TYPE typo instead of silently falling back to local', () => {

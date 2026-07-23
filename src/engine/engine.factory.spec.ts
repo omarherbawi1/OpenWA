@@ -102,6 +102,28 @@ describe('EngineFactory', () => {
     expect(registeredIds).toContain('baileys');
   });
 
+  it('registers the built-in Zapo engine with the opaque engine config blob', async () => {
+    const registerBuiltInPlugin = jest.fn();
+    const pluginLoader = {
+      registerBuiltInPlugin,
+      enablePlugin: jest.fn().mockResolvedValue(undefined),
+      getPlugin: jest.fn(),
+    } as unknown as PluginLoaderService;
+
+    const factory = new EngineFactory(buildConfigService(), pluginLoader, buildMessageStore(), buildLidStore());
+    await factory.onModuleInit();
+
+    expect(registerBuiltInPlugin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'zapo',
+        type: PluginType.ENGINE,
+        provides: ['whatsapp-engine', 'voice-calls'],
+      }),
+      expect.anything(),
+      engineBlob,
+    );
+  });
+
   it('falls back to the direct adapter when no engine plugin is available', () => {
     const pluginLoader = {
       getPlugin: jest.fn().mockReturnValue(undefined),
@@ -168,6 +190,23 @@ describe('EngineFactory', () => {
         buildLidStore(),
       );
       await factory.purgeSessionData('bob');
+
+      expect(fs.existsSync(dir)).toBe(false);
+    });
+
+    it('removes the Zapo SQLite session dir (<authDir>/<name>) when the active engine is zapo', async () => {
+      const authDir = path.join(tmpRoot, 'zapo');
+      const dir = path.join(authDir, 'carol');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'state.sqlite'), '');
+
+      const factory = new EngineFactory(
+        buildConfigService({ 'engine.type': 'zapo', 'engine.zapo.authDir': authDir }),
+        noPluginLoader(),
+        buildMessageStore(),
+        buildLidStore(),
+      );
+      await factory.purgeSessionData('carol');
 
       expect(fs.existsSync(dir)).toBe(false);
     });

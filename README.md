@@ -55,6 +55,7 @@ Built on a **pluggable architecture**, OpenWA lets you swap database engines (SQ
 | Multi-Session | ✅     | Manage multiple WhatsApp accounts    |
 | Webhooks      | ✅     | Real-time events with HMAC signature and optional smart pre-dispatch filters |
 | Web Dashboard | ✅     | Visual management interface          |
+| Voice Calls   | ✅     | Linked-device 1:1 audio via the optional Zapo engine |
 | API Key Auth  | ✅     | Secure API authentication            |
 | Swagger Docs  | ✅     | Interactive API documentation        |
 
@@ -319,12 +320,18 @@ The key can be passed as `Authorization: Bearer …` or `X-API-Key: …`. Every 
 | **Runtime**   | Node.js 22 LTS          |
 | **Framework** | NestJS 11.x             |
 | **Language**  | TypeScript 5.x          |
-| **WA Engine** | whatsapp-web.js (default) / baileys — set `ENGINE_TYPE` |
+| **WA Engine** | whatsapp-web.js (default) / Baileys / Zapo voice — set `ENGINE_TYPE` |
 | **Database**  | SQLite / PostgreSQL     |
 | **Cache**     | Redis (optional)        |
 | **Storage**   | Local / S3 / MinIO      |
 | **ORM**       | TypeORM                 |
 | **Container** | Docker + Docker Compose |
+
+Set `ENGINE_TYPE=zapo` for linked-device one-to-one voice calls. Zapo requires a
+new QR link (existing whatsapp-web.js/Baileys credentials are not portable),
+outbound UDP access to WhatsApp media relays, and HTTPS or localhost for browser
+microphone capture. See [Engine Capability Matrix](docs/engine-capability-matrix.md)
+for the supported messaging subset and operational caveats.
 
 ---
 
@@ -373,6 +380,7 @@ Comprehensive documentation is available in the `docs/` folder:
 | [Security](./docs/04-security-design.md)                | Security implementation      |
 | [Database](./docs/05-database-design.md)                | Data models and migrations   |
 | [API Spec](./docs/06-api-specification.md)              | Complete API reference       |
+| [Voice Calling](./docs/voice-calling.md)                | Zapo calls and live audio    |
 | [Development](./docs/08-development-guidelines.md)      | Coding standards             |
 | [Migration Guide](./docs/14-migration-guide.md)         | Database & storage migration |
 

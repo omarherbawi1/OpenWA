@@ -491,6 +491,9 @@ Real-time updates use **socket.io** (`socket.io-client`), not a raw browser `Web
 - **Namespace `/events`** (not `/ws`). The client connects to
   `${VITE_WS_URL || window.location.origin}/events` — same-origin by default; `VITE_WS_URL` only
   overrides it for split-origin deployments.
+- Voice media uses a second **`/calls`** namespace through `useCallMedia`. It
+  carries authenticated 16 kHz PCM uplink/downlink and shares the same
+  `/socket.io` transport path and `VITE_WS_URL` origin.
 - **API key via the socket.io `auth` payload (and an `X-API-Key` header for proxies), deliberately
   *not* in the query string** — a key in the handshake URL would leak into access logs / `Referer`.
 - **Reconnection is socket.io's built-in mechanism** — `reconnectionAttempts: 5`,

@@ -1236,6 +1236,364 @@
         ]
       }
     },
+    "/api/sessions/{sessionId}/calls": {
+      "get": {
+        "operationId": "CallController_list",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VoiceCallResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started"
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "501": {
+            "description": "Active engine does not support voice-call media"
+          }
+        },
+        "summary": "List current voice-call snapshots for a session",
+        "tags": [
+          "calls"
+        ]
+      },
+      "post": {
+        "operationId": "CallController_start",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCallDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCallResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid peer or session is not started"
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "501": {
+            "description": "Active engine does not support voice-call media"
+          }
+        },
+        "summary": "Start an outgoing voice call",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/calls/{callId}": {
+      "get": {
+        "operationId": "CallController_get",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callId",
+            "required": true,
+            "in": "path",
+            "description": "Call ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCallResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session or call not found"
+          },
+          "501": {
+            "description": "Active engine does not support voice-call media"
+          }
+        },
+        "summary": "Get a voice-call snapshot",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/calls/{callId}/accept": {
+      "post": {
+        "operationId": "CallController_accept",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callId",
+            "required": true,
+            "in": "path",
+            "description": "Call ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallActionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Call cannot be accepted in its current state"
+          },
+          "404": {
+            "description": "Session or call not found"
+          }
+        },
+        "summary": "Accept an incoming voice call",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/calls/{callId}/reject": {
+      "post": {
+        "operationId": "CallController_reject",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callId",
+            "required": true,
+            "in": "path",
+            "description": "Call ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCallDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallActionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Call cannot be rejected in its current state"
+          },
+          "404": {
+            "description": "Session or call not found"
+          }
+        },
+        "summary": "Reject an incoming voice call",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/calls/{callId}/end": {
+      "post": {
+        "operationId": "CallController_end",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callId",
+            "required": true,
+            "in": "path",
+            "description": "Call ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndCallDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallActionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Call has already ended"
+          },
+          "404": {
+            "description": "Session or call not found"
+          }
+        },
+        "summary": "End a voice call",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/calls/{callId}/mute": {
+      "patch": {
+        "operationId": "CallController_mute",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callId",
+            "required": true,
+            "in": "path",
+            "description": "Call ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuteCallDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallActionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Call has already ended"
+          },
+          "404": {
+            "description": "Session or call not found"
+          }
+        },
+        "summary": "Mute or unmute outgoing voice-call audio",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/messages": {
       "get": {
         "operationId": "MessageController_getMessages",
@@ -5855,6 +6213,10 @@
                 "session.qr",
                 "session.authenticated",
                 "session.disconnected",
+                "call.incoming",
+                "call.state",
+                "call.ended",
+                "call.error",
                 "group.join",
                 "group.leave",
                 "group.update",
@@ -5997,6 +6359,10 @@
                 "session.qr",
                 "session.authenticated",
                 "session.disconnected",
+                "call.incoming",
+                "call.state",
+                "call.ended",
+                "call.error",
                 "group.join",
                 "group.leave",
                 "group.update",
@@ -6041,6 +6407,142 @@
             "description": "Retry count"
           }
         }
+      },
+      "VoiceCallResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Engine-neutral call ID"
+          },
+          "peerId": {
+            "type": "string",
+            "description": "Neutral WhatsApp peer ID",
+            "example": "628123456789@c.us"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "incoming",
+              "outgoing"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "initiating",
+              "ringing",
+              "incoming_ringing",
+              "connecting",
+              "active",
+              "on_hold",
+              "ended"
+            ]
+          },
+          "media": {
+            "type": "string",
+            "enum": [
+              "audio"
+            ]
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "endReason": {
+            "type": "string"
+          },
+          "canAccept": {
+            "type": "boolean"
+          },
+          "canReject": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "peerId",
+          "direction",
+          "state",
+          "media",
+          "muted",
+          "createdAt",
+          "canAccept",
+          "canReject"
+        ]
+      },
+      "StartCallDto": {
+        "type": "object",
+        "properties": {
+          "peerId": {
+            "type": "string",
+            "description": "Neutral WhatsApp peer ID",
+            "example": "628123456789@c.us"
+          }
+        },
+        "required": [
+          "peerId"
+        ]
+      },
+      "CallActionResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "RejectCallDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Optional rejection reason",
+            "maxLength": 255
+          }
+        }
+      },
+      "EndCallDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Optional end reason",
+            "maxLength": 255
+          }
+        }
+      },
+      "MuteCallDto": {
+        "type": "object",
+        "properties": {
+          "muted": {
+            "type": "boolean",
+            "description": "Whether outgoing microphone audio is muted",
+            "example": true
+          }
+        },
+        "required": [
+          "muted"
+        ]
       },
       "SendTextMessageDto": {
         "type": "object",

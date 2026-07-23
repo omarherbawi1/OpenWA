@@ -9,13 +9,18 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { resolveCorsPolicy } from '../../config/bootstrap-security';
 import { resolveClientIp as resolveRequestClientIp, type RequestLike } from '../../common/utils/ip';
 import type { ApiKey } from '../auth/entities/api-key.entity';
+import {
+  WebSocketEvictionRegistry,
+  type ApiKeyEvictionReason,
+  type ApiKeySocketEvictor,
+} from '../auth/websocket-eviction.registry';
 
 /**
  * WebSocket CORS origin: reuse the HTTP CORS policy instead of a hardcoded '*'.
@@ -49,6 +54,7 @@ import type {
 } from './dto/ws-messages.dto';
 import { SUBSCRIBABLE_EVENTS, buildRoomName } from './dto/ws-messages.dto';
 import type { DeliveryStatus } from '../../engine/interfaces/whatsapp-engine.interface';
+import type { VoiceCall } from '../../engine/interfaces/voice-call-engine.interface';
 
 /**
  * Whether an API key may subscribe to a session's WebSocket event rooms.
@@ -67,9 +73,6 @@ export function isSessionSubscriptionAllowed(allowedSessions: string[] | null | 
   return allowedSessions.includes(sessionId);
 }
 
-/** Why an API key's live WebSocket sockets are being torn down — drives the client-facing message. */
-export type ApiKeyEvictionReason = 'revoked' | 'deleted' | 'authorization_changed';
-
 const EVICTION_MESSAGES: Record<ApiKeyEvictionReason, string> = {
   revoked: 'API key has been revoked',
   deleted: 'API key has been deleted',
@@ -82,7 +85,9 @@ const EVICTION_MESSAGES: Record<ApiKeyEvictionReason, string> = {
   },
   namespace: '/events',
 })
-export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class EventsGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy, ApiKeySocketEvictor
+{
   @WebSocketServer()
   server: Server;
 
@@ -94,11 +99,19 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    * an already-subscribed socket keeps receiving events until it happens to disconnect).
    */
   private readonly socketsByKeyId = new Map<string, Set<Socket>>();
+  private readonly unregisterEvictor: () => void;
 
   constructor(
     private readonly authService: AuthService,
     private readonly auditService: AuditService,
-  ) {}
+    evictionRegistry: WebSocketEvictionRegistry,
+  ) {
+    this.unregisterEvictor = evictionRegistry.register(this);
+  }
+
+  onModuleDestroy(): void {
+    this.unregisterEvictor();
+  }
 
   afterInit() {
     this.logger.log('WebSocket Gateway initialized');
@@ -180,6 +193,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       return;
     }
 
+    // Socket.IO may deliver a subscribe event immediately after acknowledging its connect packet,
+    // before this async hook has completed database validation. Preserve the handshake credential
+    // synchronously so that subscription can perform its own fresh validation without a false reject.
+    const socketData = client.data as { apiKey?: unknown; rawApiKey?: string };
+    socketData.rawApiKey = apiKey;
+
     try {
       // validateApiKey THROWS on any failure (it never resolves to a falsy value), so the rejection
       // path is the catch below — a separate `if (!validKey)` branch here was dead code. The clientIp
@@ -189,11 +208,11 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
       // Store the validated key AND the raw key — the raw key lets handleSubscribe
       // RE-validate on each subscription so a key revoked mid-connection is caught.
-      (client.data as { apiKey: unknown; rawApiKey: string }).apiKey = validKey;
-      (client.data as { rawApiKey: string }).rawApiKey = apiKey;
+      socketData.apiKey = validKey;
       this.trackSocket(validKey.id, client);
       this.logger.log(`Client connected: ${client.id} (key: ${validKey.name})`);
     } catch (error) {
+      delete socketData.rawApiKey;
       this.logger.warn(`Client ${client.id} rejected: Auth error`, {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -431,5 +450,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    */
   emitMessageReaction(sessionId: string, data: Record<string, unknown>) {
     this.emitToRooms(sessionId, 'message.reaction', data);
+  }
+
+  emitCallIncoming(sessionId: string, call: VoiceCall): void {
+    this.emitToRooms(sessionId, 'call.incoming', call);
+  }
+
+  emitCallState(sessionId: string, call: VoiceCall): void {
+    this.emitToRooms(sessionId, 'call.state', call);
+  }
+
+  emitCallEnded(sessionId: string, call: VoiceCall): void {
+    this.emitToRooms(sessionId, 'call.ended', call);
+  }
+
+  emitCallError(sessionId: string, data: { callId?: string; error: string }): void {
+    this.emitToRooms(sessionId, 'call.error', data);
   }
 }

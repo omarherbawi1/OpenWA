@@ -5,6 +5,7 @@ import { UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { createHash, createHmac } from 'crypto';
 import { AuthService, resolveSeedApiKey, bannerKeyLine } from './auth.service';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
+import { WebSocketEvictionRegistry } from './websocket-eviction.registry';
 
 // Helpers
 const hashKey = (key: string) => createHash('sha256').update(key).digest('hex');
@@ -84,6 +85,7 @@ describe('bannerKeyLine (startup banner key masking)', () => {
 describe('AuthService', () => {
   let service: AuthService;
   let repository: jest.Mocked<Partial<Repository<ApiKey>>>;
+  let evictionRegistry: { evictApiKey: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -94,6 +96,7 @@ describe('AuthService', () => {
       save: jest.fn(),
       remove: jest.fn(),
     };
+    evictionRegistry = { evictApiKey: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -101,6 +104,10 @@ describe('AuthService', () => {
         {
           provide: getRepositoryToken(ApiKey, 'main'),
           useValue: repository,
+        },
+        {
+          provide: WebSocketEvictionRegistry,
+          useValue: evictionRegistry,
         },
       ],
     }).compile();
@@ -195,45 +202,33 @@ describe('AuthService', () => {
     });
 
     it('evicts active WebSocket sockets when allowedSessions narrows', async () => {
-      const evictApiKey = jest.fn();
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockReturnValue({ evictApiKey });
       const key = createMockApiKey({ allowedSessions: ['sess-A', 'sess-B'] });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
       (repository.save as jest.Mock).mockImplementation(k => Promise.resolve(k));
 
       await service.update('uuid-1', { allowedSessions: ['sess-A'] });
 
-      expect(evictApiKey).toHaveBeenCalledWith('uuid-1', 'authorization_changed');
+      expect(evictionRegistry.evictApiKey).toHaveBeenCalledWith('uuid-1', 'authorization_changed');
     });
 
     it('evicts active WebSocket sockets when the role changes', async () => {
-      const evictApiKey = jest.fn();
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockReturnValue({ evictApiKey });
       const key = createMockApiKey({ role: ApiKeyRole.OPERATOR });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
       (repository.save as jest.Mock).mockImplementation(k => Promise.resolve(k));
 
       await service.update('uuid-1', { role: ApiKeyRole.ADMIN });
 
-      expect(evictApiKey).toHaveBeenCalledWith('uuid-1', 'authorization_changed');
+      expect(evictionRegistry.evictApiKey).toHaveBeenCalledWith('uuid-1', 'authorization_changed');
     });
 
     it('does not evict on a benign (name-only) update', async () => {
-      const evictApiKey = jest.fn();
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockReturnValue({ evictApiKey });
       const key = createMockApiKey({ name: 'original' });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
       (repository.save as jest.Mock).mockImplementation(k => Promise.resolve(k));
 
       await service.update('uuid-1', { name: 'renamed' });
 
-      expect(evictApiKey).not.toHaveBeenCalled();
+      expect(evictionRegistry.evictApiKey).not.toHaveBeenCalled();
     });
   });
 
@@ -257,11 +252,6 @@ describe('AuthService', () => {
     });
 
     it('evicts active WebSocket sockets authenticated with the deleted key', async () => {
-      const evictApiKey = jest.fn();
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockReturnValue({ evictApiKey });
-
       const key = createMockApiKey();
       (repository.findOne as jest.Mock).mockResolvedValue(key);
       (repository.remove as jest.Mock).mockResolvedValue(key);
@@ -269,7 +259,7 @@ describe('AuthService', () => {
       await service.delete('uuid-1');
 
       expect(repository.remove).toHaveBeenCalledWith(key);
-      expect(evictApiKey).toHaveBeenCalledWith('uuid-1', 'deleted');
+      expect(evictionRegistry.evictApiKey).toHaveBeenCalledWith('uuid-1', 'deleted');
     });
   });
 
@@ -285,11 +275,6 @@ describe('AuthService', () => {
     });
 
     it('evicts active WebSocket sockets authenticated with the revoked key', async () => {
-      const evictApiKey = jest.fn();
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockReturnValue({ evictApiKey });
-
       const key = createMockApiKey({ isActive: true });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
       (repository.save as jest.Mock).mockImplementation(k => Promise.resolve(k));
@@ -297,15 +282,13 @@ describe('AuthService', () => {
       await service.revoke('uuid-1');
 
       expect(key.isActive).toBe(false);
-      expect(evictApiKey).toHaveBeenCalledWith('uuid-1', 'revoked');
+      expect(evictionRegistry.evictApiKey).toHaveBeenCalledWith('uuid-1', 'revoked');
     });
 
     it('does not roll back the revoke if WebSocket eviction throws (best-effort)', async () => {
-      jest
-        .spyOn((service as unknown as { moduleRef: { get: (...a: unknown[]) => unknown } }).moduleRef, 'get')
-        .mockImplementation(() => {
-          throw new Error('gateway unavailable');
-        });
+      evictionRegistry.evictApiKey.mockImplementation(() => {
+        throw new Error('gateway unavailable');
+      });
 
       const key = createMockApiKey({ isActive: true });
       (repository.findOne as jest.Mock).mockResolvedValue(key);

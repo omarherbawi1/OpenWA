@@ -334,7 +334,7 @@ immediately above this one for the fix. The bundled image already handles this; 
 custom container that drops the `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` setup or the writable `/tmp` tmpfs.
 
 **Cause D — Debian 12 OS Chromium SIGTRAP in non-root Pods.**
-If `Code: null` happens on Kubernetes, and the host kernel logs or `dmesg` shows `Trace/breakpoint trap (core dumped)` with exit code 133, the underlying Debian 12 OS `chromium` package has crashed due to strict non-root or seccomp constraints (even with `--no-zygote` or `Unconfined` seccomp). 
+If `Code: null` happens on Kubernetes, and the host kernel logs or `dmesg` shows `Trace/breakpoint trap (core dumped)` with exit code 133, the underlying Debian 12 OS `chromium` package has crashed due to strict non-root or seccomp constraints (even with `--no-zygote` or `Unconfined` seccomp).
 *Fix:* On amd64, do not use the `chromium` package from Debian's `apt` — it SIGTRAPs under strict non-root/seccomp. Instead, download Chrome for Testing via Puppeteer during the Docker build (`./node_modules/.bin/puppeteer browsers install 'chrome@146.0.7680.31'`) and point `PUPPETEER_EXECUTABLE_PATH` to it. (Chrome for Testing has no linux-arm64 build, so arm64 keeps Debian's `chromium`, which ships a native arm64 binary.) The official `Dockerfile` implements this mixed approach.
 
 **Quick triage:** run `docker stats openwa-api`, click **Start**, and watch which resource spikes toward its
@@ -866,6 +866,22 @@ server {
     }
 }
 ```
+
+**Q: Zapo calls do not connect or the dashboard microphone fails?**
+
+1. Run `GET /api/plugins/zapo/health` with an ADMIN key. A failed result means
+   the native WebRTC/MLow runtime is unavailable on that platform.
+2. Serve the dashboard over HTTPS (or localhost), allow microphone permission,
+   and set `VITE_API_URL` plus `VITE_WS_URL` at dashboard build time when the
+   API uses another origin.
+3. Add the dashboard origin to production `CORS_ORIGINS` and proxy both `/api`
+   and `/socket.io` with WebSocket upgrades. `/calls` is a Socket.IO namespace,
+   not a separate transport path.
+4. Allow outbound TLS/WebSocket and UDP to WhatsApp. Zapo session proxies cover
+   signaling only; voice relay media remains direct. No inbound UDP mapping is
+   required.
+5. Confirm the account was linked through a new Zapo QR. Existing
+   whatsapp-web.js/Baileys auth stores cannot be reused.
 
 **Q: How to run behind Traefik / Coolify?**
 

@@ -36,7 +36,7 @@ export function validateEnv(config: EnvConfig): EnvConfig {
       errors.push(`${key} must be one of ${allowed.map(v => `"${v}"`).join(', ')} (got "${value}")`);
     }
   };
-  checkEnum('ENGINE_TYPE', ['whatsapp-web.js', 'baileys']);
+  checkEnum('ENGINE_TYPE', ['whatsapp-web.js', 'baileys', 'zapo']);
   checkEnum('STORAGE_TYPE', ['local', 's3']);
 
   if (dbType === 'postgres') {

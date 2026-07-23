@@ -6,7 +6,8 @@ import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { SUBSCRIBABLE_EVENTS, buildRoomName } from './dto/ws-messages.dto';
 import type { WSClientMessage, WSErrorResponse, WSSubscribedResponse, WSEventMessage } from './dto/ws-messages.dto';
-import { WEBHOOK_RESERVED_EVENTS } from '../webhook/dto/webhook.dto';
+import { WEBHOOK_EVENTS, WEBHOOK_RESERVED_EVENTS } from '../webhook/dto/webhook.dto';
+import { WebSocketEvictionRegistry } from '../auth/websocket-eviction.registry';
 
 describe('isSessionSubscriptionAllowed (WS session-scope enforcement)', () => {
   it('allows an unrestricted key (null allowedSessions) to subscribe to anything, including *', () => {
@@ -68,7 +69,11 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
   beforeEach(() => {
     authService = { validateApiKey: jest.fn() };
     auditService = { logWarn: jest.fn().mockResolvedValue(null) };
-    gateway = new EventsGateway(authService as unknown as AuthService, auditService as unknown as AuditService);
+    gateway = new EventsGateway(
+      authService as unknown as AuthService,
+      auditService as unknown as AuditService,
+      new WebSocketEvictionRegistry(),
+    );
   });
 
   it('rejects a connection with no API key (and never calls validate)', async () => {
@@ -109,6 +114,31 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
     await gateway.handleConnection(asSocket(sock));
     expect(sock.disconnect).not.toHaveBeenCalled();
     expect(sock.data.rawApiKey).toBe('good');
+  });
+
+  it('allows an immediate call-event subscription while connection authentication is still pending', async () => {
+    const validKey = { id: 'k1', name: 'k', allowedSessions: null };
+    let finishConnectionAuth: (key: typeof validKey) => void = () => {
+      throw new Error('Connection authentication did not start');
+    };
+    const pendingConnectionAuth = new Promise<typeof validKey>(resolve => {
+      finishConnectionAuth = resolve;
+    });
+    authService.validateApiKey.mockReturnValueOnce(pendingConnectionAuth).mockResolvedValueOnce(validKey);
+    const sock = makeSocket({ apiKey: 'good' });
+
+    const connection = gateway.handleConnection(asSocket(sock));
+    const response = (await gateway.handleMessage(
+      asSocket(sock),
+      subscribeMsg('sess-1', ['call.incoming', 'call.state', 'call.ended', 'call.error']),
+    )) as WSSubscribedResponse;
+    finishConnectionAuth(validKey);
+    await connection;
+
+    expect(response.type).toBe('subscribed');
+    expect(response.events).toEqual(['call.incoming', 'call.state', 'call.ended', 'call.error']);
+    expect(authService.validateApiKey).toHaveBeenNthCalledWith(2, 'good', '203.0.113.5');
+    expect(sock.disconnect).not.toHaveBeenCalled();
   });
 
   it('re-validates on subscribe and disconnects a key revoked after connect', async () => {
@@ -326,6 +356,7 @@ describe('EventsGateway.emitToRooms fan-out', () => {
     new EventsGateway(
       { validateApiKey: jest.fn() } as unknown as AuthService,
       { logWarn: jest.fn().mockResolvedValue(null) } as unknown as AuditService,
+      new WebSocketEvictionRegistry(),
     );
 
   it('delivers one event with a single broadcast across all four rooms (no per-room duplicate emit)', () => {
@@ -362,6 +393,7 @@ describe('event catalog ⇔ emitter invariants (drift guard)', () => {
     const gateway = new EventsGateway(
       { validateApiKey: jest.fn() } as unknown as AuthService,
       { logWarn: jest.fn().mockResolvedValue(null) } as unknown as AuditService,
+      new WebSocketEvictionRegistry(),
     );
     const captured: string[] = [];
     const op: { to: () => unknown; emit: (ch: string, msg: WSEventMessage) => boolean } = {
@@ -385,6 +417,12 @@ describe('event catalog ⇔ emitter invariants (drift guard)', () => {
   it('reserved webhook group.* events are NOT advertised as socket-subscribable', () => {
     for (const reserved of WEBHOOK_RESERVED_EVENTS) {
       expect(SUBSCRIBABLE_EVENTS).not.toContain(reserved);
+    }
+  });
+
+  it('every socket control event is also present in the webhook catalog', () => {
+    for (const event of SUBSCRIBABLE_EVENTS) {
+      expect(WEBHOOK_EVENTS).toContain(event);
     }
   });
 });

@@ -35,6 +35,7 @@ import { PluginsApiModule } from './modules/plugins/plugins.module';
 import { AgentToolsModule } from './core/agent-tools/agent-tools.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { SearchModule } from './modules/search/search.module';
+import { CallModule } from './modules/call/call.module';
 
 // Only import QueueModule if explicitly enabled to avoid Redis connection errors
 const queueModules: Array<Type | DynamicModule> = [];
@@ -248,6 +249,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
     AuthModule,
     EngineModule,
     SessionModule,
+    CallModule,
     MessageModule,
     TemplateModule,
     WebhookModule,
